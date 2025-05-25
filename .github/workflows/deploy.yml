@@ -28,6 +28,12 @@ jobs:
       run: |
         npm install -g bower
         bower install
+        
+    - name: 🚀 Start Application (http-server)
+      run: |
+        npm install -g http-server
+        nohup npm start &
+        sleep 5 # Wait a few seconds to ensure the server is up
 
     - name: 🧪 Run Unit Tests with Karma
       run: npm test
