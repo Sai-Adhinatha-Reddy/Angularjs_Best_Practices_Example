@@ -1,39 +1,57 @@
-name: AngularJS CI Pipeline
+name: CI-CD Pipeline
 
 on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
 
 jobs:
-  build-and-test:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: nodejs-assignment-1
+      IMAGE_TAG: latest
+
     steps:
-    - name: ⬇️ Checkout source code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: 🟢 Set up Node.js 22.14.0
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.14.0'
+      - name: Use Node.js 22.14.0
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22.14.0'
 
-    - name: 📦 Install project dependencies
-      run: npm install
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install -g bower
+          bower install
 
-    - name: 📦 Install Bower dependencies
-      run: |
-        npm install -g bower
-        bower install
-        
-    - name: 🚀 Start Application (http-server)
-      run: |
-        npm install -g http-server
-        nohup npm start &
-        sleep 5 # Wait a few seconds to ensure the server is up
+      - name: Run tests
+        run: npm test
 
-    - name: 🧪 Run Unit Tests with Karma
-      run: npm test
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_REPOSITORY .
+          docker tag $ECR_REPOSITORY:latest ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Start the application
+        run: npm start
