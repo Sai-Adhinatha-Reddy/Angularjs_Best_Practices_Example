@@ -10,8 +10,9 @@ describe('Main controller', function () {
     beforeEach(module('myApp.home'));
     beforeEach(module('myApp'));
 
-    beforeEach(inject(function ($controller) {
-        controller = $controller('MainController');
+    beforeEach(inject(function (_$controller_, _$rootScope_) {
+        $scope = _$rootScope_.$new();
+		$controller = _$controller_('MainController', { $scope: $scope });
     }));
 
     it('should define a title', function () {
