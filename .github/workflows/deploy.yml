@@ -60,15 +60,17 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}       # Private SSH key stored in GitHub Secrets
           port: 22
           script: |
+            export AWS_REGION=us-east-1
             echo "Logging in to AWS ECR on EC2"
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
             echo "Stopping old container (if any)..."
-            docker stop myapp || true
-            docker rm myapp || true
+            sudo docker stop myapp || true
+            sudo docker rm myapp || true
 
             echo "Pulling new image..."
-            docker pull ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+            echo "Full image path: ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG"
+            sudo docker pull ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
 
             echo "Starting new container..."
-            docker run -d --name myapp -p 7658:8000 ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+            sudo docker run -d --name myapp -p 7658:8000 ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
