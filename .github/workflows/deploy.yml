@@ -1,18 +1,18 @@
-name: CI-CD Pipeline
+name: Build, Test, Push and Deploy
 
 on:
   push:
     branches:
-      - master
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: nodejs-assignment-1
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  build-test-deploy:
+  build-test-push-deploy:
     runs-on: ubuntu-latest
-
-    env:
-      AWS_REGION: us-east-1
-      ECR_REPOSITORY: nodejs-assignment-1
-      IMAGE_TAG: latest
 
     steps:
       - name: Checkout code
@@ -21,7 +21,7 @@ jobs:
       - name: Use Node.js 22.14.0
         uses: actions/setup-node@v3
         with:
-          node-version: '22.14.0'
+          node-version: 22.14.0
 
       - name: Install dependencies
         run: |
@@ -29,8 +29,8 @@ jobs:
           npm install -g bower
           bower install
 
- #     - name: Run tests
-  #      run: npm test
+#      - name: Run tests
+ #       run: npm test
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -40,7 +40,6 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: ecr-login
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
@@ -53,5 +52,23 @@ jobs:
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Start the application
-        run: npm start
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}       # Private SSH key stored in GitHub Secrets
+          port: 22
+          script: |
+            echo "Logging in to AWS ECR on EC2"
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            echo "Stopping old container (if any)..."
+            docker stop myapp || true
+            docker rm myapp || true
+
+            echo "Pulling new image..."
+            docker pull ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+            echo "Starting new container..."
+            docker run -d --name myapp -p 7658:8000 ${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:$IMAGE_TAG
