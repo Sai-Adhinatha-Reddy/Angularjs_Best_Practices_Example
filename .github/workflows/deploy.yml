@@ -59,8 +59,8 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}       # Private SSH key stored in GitHub Secrets
           port: 22
+          envs: ECR_REPOSITORY,IMAGE_TAG,AWS_REGION
           script: |
-            export AWS_REGION=us-east-1
             echo "Logging in to AWS ECR on EC2"
             aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
